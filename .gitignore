@@ -1,0 +1,28 @@
+# Local configuration and credentials
+config.local.yaml
+*.local.yaml
+*.local.yml
+*.private.yaml
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Downloaded providers and runtime data
+providers/
+rules/
+*.db
+*.dat
+*.mmdb
+*.metadb
+*.mrs
+*.log
+
+# Local workspace state and backups
+.agent/
+*.bak
+*.backup
+.DS_Store
+__pycache__/

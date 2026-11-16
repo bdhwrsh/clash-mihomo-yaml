@@ -1,0 +1,620 @@
+# Clash / Mihomo 通用版配置
+# 游乐王子私藏版~ 经历多年调校
+# 井号#后为备注，不会被代理工具内核读取，可以备注自己看得懂的文字
+# 节点、凭据和订阅地址均为示例，填写自己的参数后再使用。
+
+# 全局基础设置
+bind-address: "*"         # 监听所有可用的网络接口
+mode: rule                # 按下方 rules 分流
+ipv6: true                # 允许内核处理 IPv6 流量, false关掉
+profile:
+  store-selected: true    # 记住手动选择的策略组节点
+  store-fake-ip: true     # 保存 Fake-IP 映射，减少重启后的抖动。小机器很有用。
+keep-alive-idle: 600      # TCP 保活前的空闲时间，单位：秒
+keep-alive-interval: 15   # TCP 保活间隔，单位：秒
+log-level: error          # 平时只记录错误；内存宽裕可以用 info；排查时临时可改为 debug
+tcp-concurrent: true      # 多个解析结果并发连接，采用先成功的连接
+unified-delay: true       # 统一测速口径，减少握手耗时对显示结果的影响
+find-process-mode: strict # 按需识别进程，供下方 PROCESS-NAME 规则使用，不支持的平台会静默略过
+
+# GEO 数据更新
+geo-auto-update: true           # 自动更新 GEO 数据
+geo-update-interval: 72         # 更新间隔，单位：小时
+geodata-mode: false             # false 使用 MMDB；true 使用 DAT 格式的 GeoIP
+geodata-loader: memconservative # 省内存模式；全量载入用 standard（pc、Mac可以用，小路由器禁用，容易爆内存）
+
+# GEO 数据源
+geox-url:
+  geosite: https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat    # 域名分类库（GEOSITE规则从这匹配）
+  geoip: https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.dat        # DAT 格式的 IP 分类库
+  mmdb: https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.metadb      # MMDB 格式的 IP 分类库
+  # mmdb: https://testingcf.jsdelivr.net/gh/alecthw/mmdb_china_ip_list@release/lite/Country.mmdb # 可选的精简版，仅包含中国大陆 IP
+
+hosts: {} # 可选：固定域名对应的 IP；适合有个人VPS的用户，在这里钉死自己的代理服务器地址
+  # node-a.example.com: 192.0.2.10
+  # node-b.example.com: 198.51.100.20
+  # node-c.example.com: "2001:db8::30"
+
+dns:   # 重中之重，建议不要乱改/ 很多时候dns段影响的是日常上网每一次点击的那几十毫秒延迟，错误的配置可能增加卡顿，却难以排查，非常影响体验感。
+  enable: true
+  ipv6: true           # 这里的是IPv6 的dns查询开关，开着没坏处。如果不用IPv6可以在上面的总开关关掉IPv6，这里开着也无妨
+  respect-rules: false # false：DNS 请求的出口不按下方 rules 选择
+  default-nameserver:  # 先解析下方nameserver 加密 DNS 服务器自身的域名，用于启动引导
+  - 223.5.5.5
+  - 119.29.29.29
+  nameserver: # 兜底的DNS，以下几种nameserver都可以删，如果不存在就会命中这里。未命中 nameserver-policy 时使用的加密 DNS
+  - https://dns.alidns.com/dns-query
+  - https://1.1.1.1/dns-query
+  - https://dns.google/dns-query
+  proxy-server-nameserver: # 解析代理服务器域名时用的DNS查询
+  - https://dns.alidns.com/dns-query
+  - https://doh.pub/dns-query
+  proxy-server-nameserver-policy: # 为指定的节点域名单独设置的DNS，保护你的节点不泄露，用不到可以删掉
+    "node-a.example.com": # 示例：为指定节点域名单独设置 DNS；按需替换或删除此策略
+    - https://1.1.1.1/dns-query
+    - https://dns.alidns.com/dns-query
+  nameserver-policy:
+    "geosite:cn":        # 中国大陆域名使用国内加密 DNS
+      - https://dns.alidns.com/dns-query
+      - https://doh.pub/dns-query
+    "geosite:private":   # 使用普通 DNS；有内网域名时请换成能解析它们的本地 DNS
+      - 223.5.5.5
+      - 119.29.29.29
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16 # IPv4 Fake-IP 地址池
+  fake-ip-range6: 2001:2::1/64 # IPv6 Fake-IP 地址池
+  fake-ip-filter-mode: blacklist       # 默认返回 Fake-IP；下方列表中的域名返回真实 IP
+  fake-ip-filter:
+    # —— 局域网 & 本机 ——
+    - "localhost"
+    - "+.localhost"
+    - "+.localdomain"
+    - "+.lan"
+    - "+.local"
+    - "+.arpa"
+    - "+.internal"
+    - "+.intranet"
+    - "+.home"
+    - "+.corp"
+    - "+.private"
+    - "+.ts.net"
+    - "+.router.asus.com"
+    - "+.linksyssmartwifi.com"
+    - "+.tplinkwifi.net"
+    - "+.miwifi.com"
+    - "+.routerlogin.net"
+    # —— iCloud Private Relay 避免 Fake-IP ——
+    - "mask.icloud.com"
+    - "mask-h2.icloud.com"
+    - "mask-api.icloud.com"
+    # —— 公共解析（避免假IP）——
+    - "resolver1.opendns.com"
+    # —— 联网检测 / 公共 Wi-Fi 登录页：保留真实 IP，减少检测异常 ——
+    - "captive.apple.com"
+    - "connectivitycheck.gstatic.com"
+    - "+.msftconnecttest.com"
+    - "+.msftncsi.com"
+    - "detectportal.firefox.com"
+    - "nmcheck.gnome.org"
+    # —— STUN/TURN（语音/视频打洞）——
+    - "stun.*.*"
+    - "stun.*.*.*"
+    - "+.stun.*.*"
+    - "+.stun.*.*.*"
+    - "stun1.l.google.com"
+    - "stun2.l.google.com"
+    - "stun3.l.google.com"
+    - "stun4.l.google.com"
+    # —— 时间同步 NTP ——
+    - "time.*.com"
+    - "ntp.*.com"
+    - "+.ntp.org"
+    - "+.ntp.org.cn"
+    - "+.time.edu.cn"
+    - "time.*.gov"
+    - "time.apple.com"
+    - "time.*.apple.com"
+    - "time-ios.apple.com"
+    - "time-macos.apple.com"
+# DNS 设置结束
+
+# 规则集供应商
+rule-providers:
+  ASN-apple-714:
+    type: http
+    behavior: ipcidr
+    format: mrs
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/asn/AS714.mrs"
+    interval: 86400
+
+  GEOIP-telegram:
+    type: http
+    behavior: ipcidr
+    format: mrs
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/telegram.mrs"
+    interval: 86400
+
+# 节点列表 proxies
+# A / B / C 代表三台示例服务器，每台演示 Reality 与 Hysteria2 两种协议。
+# 示例A / B 代表常用主力低延迟节点（加入自动测速），示例C 代表特定地区或备用节点（按需用于地区选择或专用出口）。
+# 必填：server、port、UUID/密码、SNI，以及 Reality 公钥和 short-id。
+# 下方 UUID、全 A 公钥、全 0 short-id 都是无效凭据占位；不是可使用的节点。
+# 删掉或重命名节点时，记得同步修改下方各组的 proxies 引用。
+# 说的有点儿复杂了，小白只需记住一句：从你的机场拿到订阅链接，然后找你的AI助手给你转写一下。转成下面的格式
+
+proxies:
+
+- name: "示例A Reality"
+  type: vless
+  server: node-a.example.com
+  port: 443
+  uuid: 00000000-0000-4000-8000-000000000001 # 替换为服务端分配的 UUID
+  network: tcp
+  tls: true
+  udp: true
+  flow: xtls-rprx-vision
+  servername: www.example.com # 与服务端的 Reality SNI 一致
+  reality-opts:
+    public-key: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" # 替换为服务端的 Reality 公钥
+    short-id: "0000000000000000" # 与服务端 short-id 一致，按字符串填写
+    spider-x: "/"
+    support-x25519mlkem768: true  # 需支持该字段的内核；与服务端要求配套，保留 chrome 指纹
+  client-fingerprint: chrome
+
+- name: "示例A Hysteria2"
+  type: hysteria2
+  server: node-a.example.com
+  port: 443
+  password: "REPLACE_WITH_YOUR_HYSTERIA2_PASSWORD"
+  sni: node-a.example.com
+  skip-cert-verify: false
+  fast-open: true
+  udp: true
+  up: "50 Mbps"      # 示例上行带宽，按实际网络和服务端设置修改
+  down: "200 Mbps"   # 示例下行带宽，按实际网络和服务端设置修改
+  heartbeat: 15s
+
+- name: "示例B Reality"
+  type: vless
+  server: node-b.example.com
+  port: 443
+  uuid: 00000000-0000-4000-8000-000000000002 # 替换为服务端分配的 UUID
+  network: tcp
+  tls: true
+  udp: true
+  flow: xtls-rprx-vision
+  servername: www.example.com # 与服务端的 Reality SNI 一致
+  reality-opts:
+    public-key: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" # 替换为服务端的 Reality 公钥
+    short-id: "0000000000000000" # 与服务端 short-id 一致，按字符串填写
+    spider-x: "/"
+    support-x25519mlkem768: true  # 需支持该字段的内核；与服务端要求配套，保留 chrome 指纹
+  client-fingerprint: chrome
+
+- name: "示例B Hysteria2"
+  type: hysteria2
+  server: node-b.example.com
+  port: 443
+  password: "REPLACE_WITH_YOUR_HYSTERIA2_PASSWORD"
+  sni: node-b.example.com
+  skip-cert-verify: false
+  fast-open: true
+  udp: true
+  up: "50 Mbps"      # 示例上行带宽，按实际网络修改 
+  down: "200 Mbps"   # 示例下行带宽，按实际网络修改 不确定就删掉，写过大了不会提升网速，只会增加丢包
+  heartbeat: 15s
+
+- name: "示例C Reality"
+  type: vless
+  server: node-c.example.com
+  port: 443
+  uuid: 00000000-0000-4000-8000-000000000003 # 替换为服务端分配的 UUID
+  network: tcp
+  tls: true
+  udp: true
+  flow: xtls-rprx-vision
+  servername: www.example.com # 与服务端的 Reality SNI 一致
+  reality-opts:
+    public-key: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" # 替换为服务端的 Reality 公钥
+    short-id: "0000000000000000" # 与服务端 short-id 一致，按字符串填写
+    spider-x: "/"
+    support-x25519mlkem768: true  # 需支持该字段的内核；与服务端要求配套，保留 chrome 指纹
+  client-fingerprint: chrome
+
+- name: "示例C Hysteria2"
+  type: hysteria2
+  server: node-c.example.com
+  port: 443
+  password: "REPLACE_WITH_YOUR_HYSTERIA2_PASSWORD"
+  sni: node-c.example.com
+  skip-cert-verify: false
+  fast-open: true
+  udp: true
+  up: "50 Mbps"      # 示例上行带宽，按实际网络和服务端设置修改
+  down: "200 Mbps"   # 示例下行带宽，按实际网络和服务端设置修改
+  heartbeat: 15s
+
+# 代理集 proxy-providers（远程节点订阅）
+proxy-providers:
+  subscription: # 填入服务商提供的 Clash / Mihomo 格式节点订阅
+    type: http
+    url: "https://subscription.example.com/REPLACE_WITH_YOUR_SUBSCRIPTION" # 必须替换，示例地址不可用
+    interval: 43200 # 每 12 小时更新订阅，单位：秒
+    path: ./providers/subscription.yaml
+    health-check: # 定时检查订阅节点是否可用
+      enable: true
+      url: http://cp.cloudflare.com/generate_204
+      interval: 600
+
+# 代理分组配置
+proxy-groups:
+- name: 🔰 节点选择 # 常用代理总入口，可手动切换具体节点或策略组
+  proxies:
+  - ♻️ 自动选择
+  - 🚀 订阅优选
+  - 🎯 全球直连
+  - 示例A Reality
+  - 示例A Hysteria2
+  - 示例B Reality
+  - 示例B Hysteria2
+  - 示例C Reality
+  - 示例C Hysteria2
+  type: select
+
+- name: ♻️ 自动选择
+  interval: 600  # 每 10 分钟测速一次，减少频繁切换和移动端耗电
+  tolerance: 150 # 延迟差未超过此值时尽量不切换，单位：毫秒
+  proxies:
+  - 示例A Reality
+  - 示例A Hysteria2
+  - 示例B Reality
+  - 示例B Hysteria2
+  type: url-test
+  url: http://cp.cloudflare.com/generate_204
+
+- name: 🚀 订阅优选 # 在订阅节点中自动选择低延迟节点
+  use:
+  - subscription
+  type: url-test
+  interval: 600  # 定时测速周期，单位：秒
+  tolerance: 200 # 延迟差未超过此值时尽量不切换，单位：毫秒
+  url: http://cp.cloudflare.com/generate_204
+
+- name: Ⓜ️ 微软服务
+  proxies:
+  - 🔰 节点选择
+  - 🚀 订阅优选
+  - 🎯 全球直连
+  - 示例A Reality
+  - 示例A Hysteria2
+  - 示例B Reality
+  - 示例B Hysteria2
+  - 示例C Reality
+  - 示例C Hysteria2
+  type: select
+
+- name: 🎬 社媒视频
+  proxies:
+  - 🚀 订阅优选
+  - 🔰 节点选择
+  - ♻️ 自动选择
+  - 🎯 全球直连
+  - 示例A Reality
+  - 示例A Hysteria2
+  - 示例B Reality
+  - 示例B Hysteria2
+  - 示例C Reality
+  - 示例C Hysteria2
+  type: select
+
+- name: 🌍 地区选择 # 需特定地区出口的服务，在此手动选择对应节点
+  proxies:
+  - 🚀 订阅优选
+  - 🔰 节点选择
+  - ♻️ 自动选择
+  - 🎯 全球直连
+  - 示例C Reality
+  - 示例C Hysteria2
+  type: select
+
+- name: 🎮 游戏代理
+  proxies:
+  - 🚀 订阅优选
+  - 🔰 节点选择
+  - ♻️ 自动选择
+  - 🎯 全球直连
+  - 示例A Reality
+  - 示例A Hysteria2
+  - 示例B Reality
+  - 示例B Hysteria2
+  - 示例C Reality
+  - 示例C Hysteria2
+  type: select
+
+- name: 🍎 苹果服务
+  proxies:
+  - 🎯 全球直连
+  - 🚀 订阅优选
+  - 🔰 节点选择
+  - ♻️ 自动选择
+  - 示例A Reality
+  - 示例A Hysteria2
+  - 示例B Reality
+  - 示例B Hysteria2
+  - 示例C Reality
+  - 示例C Hysteria2
+  type: select
+
+- name: 🇺🇳 稳定出口 # fallback 模式：平时固定走首选节点防 AI/Apple 风控，仅节点故障时按序自动切换
+  proxies:        # 注： 非常适合 Claude 用户，想避免出口IP乱跳的服务都可以丢到这个组里，IP给我钉死
+  - 示例A Reality
+  - 示例A Hysteria2
+  - 示例B Reality
+  - 示例B Hysteria2
+  - 示例C Reality
+  - 示例C Hysteria2
+  type: fallback
+  url: http://cp.cloudflare.com/generate_204
+  interval: 600 # 每 10 分钟检查一次，与自动选择组保持一致
+
+- name: 🏦 专用出口 # 优先示例C，失败后回退到稳定出口；按需换成指定地区的节点
+  hidden: true    # 可以在服务端的节点面板中隐藏这个代理组，适合长期绑死唯一IP从不手动切换的那些网站和服务，如：海外金融服务，避免风控
+  proxies:
+  - 示例C Reality
+  - 🇺🇳 稳定出口
+  type: fallback
+  url: http://cp.cloudflare.com/generate_204
+  interval: 3600 # 检查间隔 1 小时
+  lazy: true     # 仅当实际有流量命中该组时才按需检测，避免平时无谓测速消耗
+
+- name: 🎯 全球直连 # 统一的直连入口
+  hidden: true # 在支持此字段的面板中隐藏，规则仍可引用
+  proxies:
+  - DIRECT
+  type: select
+
+- name: 🐟 漏网之鱼 # 前面都没有匹配时，这里负责兜底，兜底的走代理还是直连，你自己切换
+  proxies:
+  - 🔰 节点选择
+  - 🚀 订阅优选
+  - 🎯 全球直连
+  - ♻️ 自动选择
+  - 示例A Reality
+  - 示例A Hysteria2
+  - 示例B Reality
+  - 示例B Hysteria2
+  - 示例C Reality
+  - 示例C Hysteria2
+  type: select
+
+# 分流规则段（从上到下匹配，先命中的规则生效）
+rules:
+  # 默认应该直连的系统服务（局域网 / 私有 / 保留网段）
+  - GEOSITE,private,🎯 全球直连
+  - DOMAIN-SUFFIX,local,🎯 全球直连                # .local 局域网与 Bonjour 设备发现
+  - DOMAIN-SUFFIX,localhost,🎯 全球直连            # localhost 本机及子域
+  - DOMAIN-SUFFIX,localdomain,🎯 全球直连          # 部分系统默认本地域后缀
+  - DOMAIN-SUFFIX,lan,🎯 全球直连                  # 常见路由器后台域名（如 openwrt.lan）
+  - DOMAIN-SUFFIX,arpa,🎯 全球直连                 # home.arpa 与反向解析
+  - DOMAIN-SUFFIX,internal,🎯 全球直连             # ICANN 保留的内网专用后缀
+  - DOMAIN-SUFFIX,intranet,🎯 全球直连
+  - DOMAIN-SUFFIX,home,🎯 全球直连
+  - DOMAIN-SUFFIX,corp,🎯 全球直连
+  - DOMAIN-SUFFIX,private,🎯 全球直连
+  - IP-CIDR,127.0.0.0/8,🎯 全球直连,no-resolve     # 本机回环地址
+  - IP-CIDR,0.0.0.0/8,🎯 全球直连,no-resolve       # "本网络"保留段（DHCP 未获取地址阶段）
+  - IP-CIDR,169.254.0.0/16,🎯 全球直连,no-resolve  # 链路本地地址（APIPA）
+  - IP-CIDR,10.0.0.0/8,🎯 全球直连,no-resolve      # A 类私有网段
+  - IP-CIDR,172.16.0.0/12,🎯 全球直连,no-resolve   # B 类私有网段（常见于 Docker/虚拟机）
+  - IP-CIDR,192.168.0.0/16,🎯 全球直连,no-resolve  # C 类私有网段（家用路由器默认网段）
+  - IP-CIDR,100.64.0.0/10,🎯 全球直连,no-resolve   # CGNAT 运营商大内网 / Tailscale 虚拟网段
+  - IP-CIDR,192.0.0.0/24,🎯 全球直连,no-resolve    # IETF 协议专用保留段
+  - IP-CIDR,224.0.0.0/4,🎯 全球直连,no-resolve     # 组播地址（mDNS / SSDP / IGMP）
+  - IP-CIDR,240.0.0.0/4,🎯 全球直连,no-resolve     # 保留地址与受限广播
+  - IP-CIDR6,::1/128,🎯 全球直连,no-resolve        # IPv6 本机回环
+  - IP-CIDR6,fe80::/10,🎯 全球直连,no-resolve      # IPv6 链路本地地址
+  - IP-CIDR6,fc00::/7,🎯 全球直连,no-resolve       # IPv6 唯一本地地址（ULA 私有段）
+  - IP-CIDR6,ff00::/8,🎯 全球直连,no-resolve       # IPv6 组播地址
+
+  # 公共 Wi-Fi 登录页 / 联网检测（位置关键：必须在 apple.com / microsoft 之前，否则酒店或机场 Wi-Fi 登录页弹不出来）
+  - DOMAIN,captive.apple.com,🎯 全球直连           # Apple Captive Portal 检测
+  - DOMAIN,connectivitycheck.gstatic.com,🎯 全球直连 # Android / Chrome 联网探测
+  - DOMAIN-SUFFIX,msftconnecttest.com,🎯 全球直连  # Windows 联网探测（须在 microsoft 规则之前）
+  - DOMAIN-SUFFIX,msftncsi.com,🎯 全球直连         # Windows 旧版联网探测
+  - DOMAIN,detectportal.firefox.com,🎯 全球直连    # Firefox 联网探测
+  - DOMAIN,nmcheck.gnome.org,🎯 全球直连           # Linux NetworkManager 联网探测
+
+  # NTP 时间同步：UDP 123 保持直连，防时间偏移导致 TLS 握手失败
+  - DOMAIN-SUFFIX,ntp.org,🎯 全球直连
+  - DOMAIN-SUFFIX,ntp.org.cn,🎯 全球直连
+  - DOMAIN-SUFFIX,time.apple.com,🎯 全球直连       # 苹果时间同步（须在 apple.com 之前）
+  - DOMAIN-SUFFIX,time.windows.com,🎯 全球直连     # Windows 时间同步（须在 microsoft 之前）
+  - DOMAIN-SUFFIX,time.cloudflare.com,🎯 全球直连
+  - DOMAIN-SUFFIX,time.edu.cn,🎯 全球直连
+  - DOMAIN-SUFFIX,time.nist.gov,🎯 全球直连
+
+  # BT / P2P 下载客户端直连（需客户端支持进程识别；路由器环境可忽略或删除）
+  - PROCESS-NAME,Transmission,🎯 全球直连
+  - PROCESS-NAME,uTorrent,🎯 全球直连
+  - PROCESS-NAME,WebTorrent,🎯 全球直连
+  - PROCESS-NAME,WebTorrent Helper,🎯 全球直连
+  - PROCESS-NAME,BitTorrent,🎯 全球直连
+
+  # 【 自定义直连 / 特定服务直连 】
+  - GEOSITE,tencent,🎯 全球直连                    # 腾讯全系域名直连
+  - IP-CIDR,43.160.0.0/16,🎯 全球直连,no-resolve   # 微信海外加速 CDN（新加坡），直连防收发图卡顿
+  - IP-CIDR,8.208.0.0/12,🎯 全球直连,no-resolve    # 阿里云海外接入段：防淘宝/闲鱼等无域名裸 IP 长连接走代理后被误判为「海外版」
+  - IP-CIDR,47.235.0.0/16,🎯 全球直连,no-resolve   # 阿里云海外接入段（47.235-47.246，同上防止阿里系裸 IP 误判海外站）
+  - IP-CIDR,47.236.0.0/14,🎯 全球直连,no-resolve
+  - IP-CIDR,47.240.0.0/14,🎯 全球直连,no-resolve
+  - IP-CIDR,47.244.0.0/15,🎯 全球直连,no-resolve
+  - IP-CIDR,47.246.0.0/16,🎯 全球直连,no-resolve
+  - DOMAIN-SUFFIX,jegotrip.com,🎯 全球直连         # 无忧行 App 域名直连
+  - IP-CIDR,16.162.0.0/15,🎯 全球直连,no-resolve   # 无忧行 App 香港 AWS EC2 裸 IP 语音隧道直连，防双层代理
+  - IP-CIDR,18.162.0.0/15,🎯 全球直连,no-resolve
+  - IP-CIDR,18.166.0.0/15,🎯 全球直连,no-resolve
+  - IP-CIDR,43.198.0.0/15,🎯 全球直连,no-resolve
+  - IP-CIDR,95.40.0.0/15,🎯 全球直连,no-resolve
+  - IP-CIDR,54.46.0.0/17,🎯 全球直连,no-resolve
+  - IP-CIDR,3.45.0.0/18,🎯 全球直连,no-resolve
+  - DOMAIN-SUFFIX,download.nvidia.com,🎯 全球直连  # NVIDIA 驱动下载走国内 CDN 直连
+  # - DOMAIN-SUFFIX,portal.example.org,🎯 全球直连 # 可选：自己的工作、内网门户或校园网站
+
+  - GEOSITE,steam@cn,🎯 全球直连                   # Steam 国内下载 CDN 直连（须排在下方 GEOSITE,steam 之前，满速下游戏不烧节点流量）
+
+  # 【 自定义代理规则 】
+  - DOMAIN-SUFFIX,challenges.cloudflare.com,🔰 节点选择 # Cloudflare Turnstile 人机验证走代理，减少网页反复转圈验证
+
+  # Microsoft 系 （包括GitHub）
+  - GEOSITE,microsoft@cn,🎯 全球直连    # 微软中国剔出去 走直连（须排在下方 GEOSITE,microsoft 之前）
+  - GEOSITE,microsoft,Ⓜ️ 微软服务
+
+  # 对出口地区有要求的服务：在「🌍 地区选择」中手动选合适节点
+  - GEOSITE,category-porn,🌍 地区选择
+  # - GEOSITE,bahamut,🌍 地区选择 # 示例：锁区流媒体或需要指定地区出口的站点，按需取消注释或补充
+
+  # AI 服务（大模型与开发工具对频繁跳 IP 较敏感，主力走「🇺🇳 稳定出口」）
+  - DOMAIN-SUFFIX,hf-mirror.com,🎯 全球直连        # Hugging Face 国内镜像直连
+  - DOMAIN-SUFFIX,huggingface.co,🔰 节点选择       # Hugging Face 官网与模型下载走节点选择
+  - DOMAIN-SUFFIX,cdn.hf.co,🔰 节点选择            # Hugging Face LFS / Xet 存储下载域
+  - DOMAIN-SUFFIX,xethub.hf.co,🔰 节点选择
+  - DOMAIN,platform.deepseek.com,🔰 节点选择       # DeepSeek 开放平台（部分海外节点访问更稳）
+  - DOMAIN,chat.deepseek.com,🔰 节点选择           # DeepSeek 网页端（其余域顺延直连）
+  - GEOSITE,openai,🇺🇳 稳定出口                    # OpenAI / ChatGPT / Codex
+  - GEOSITE,anthropic,🇺🇳 稳定出口                 # Anthropic / Claude 域名全集
+  - PROCESS-NAME,Claude,🇺🇳 稳定出口               # Claude 桌面客户端进程兜底（防第三方遥测域漏走其他出口）
+  - PROCESS-NAME,Claude Helper,🇺🇳 稳定出口
+  - PROCESS-NAME,Claude Helper (Renderer),🇺🇳 稳定出口
+  - PROCESS-NAME,Claude Helper (GPU),🇺🇳 稳定出口
+  - PROCESS-NAME,Claude Helper (Plugin),🇺🇳 稳定出口
+  - GEOSITE,category-ai-!cn,🇺🇳 稳定出口           # 其余海外 AI 服务合集兜底（Gemini / Cursor / Perplexity 等）
+
+  # 专用出口：对出口地区或 IP 归属地风控严格的境外金融/支付服务，走「🏦 专用出口」固定地区，可按需增删
+  - DOMAIN-SUFFIX,revolut.com,🏦 专用出口
+  - DOMAIN-SUFFIX,revolut.net,🏦 专用出口
+  - DOMAIN-SUFFIX,revolut.me,🏦 专用出口
+  - DOMAIN-SUFFIX,revolut.io,🏦 专用出口
+  - DOMAIN-SUFFIX,revolut.app,🏦 专用出口
+  - DOMAIN-SUFFIX,traderepublic.com,🏦 专用出口
+  - DOMAIN-SUFFIX,wise.com,🏦 专用出口
+  - GEOSITE,paypal,🏦 专用出口
+
+  # 社媒视频
+  - GEOSITE,youtube,🎬 社媒视频
+  - GEOSITE,netflix,🎬 社媒视频
+  - GEOSITE,disney,🎬 社媒视频
+  - GEOSITE,spotify,🎬 社媒视频
+  - GEOSITE,tiktok,🎬 社媒视频
+  - GEOSITE,twitter,🎬 社媒视频
+  - DOMAIN-SUFFIX,cvideo.twimg.com,🎬 社媒视频     # X (Twitter) 视频 CDN 
+  - GEOSITE,meta,🎬 社媒视频                       # Meta 系（Facebook / Instagram / WhatsApp / Threads）
+  - GEOSITE,reddit,🎬 社媒视频
+  - GEOSITE,twitch,🎬 社媒视频
+  - GEOSITE,discord,🎬 社媒视频
+  - GEOSITE,primevideo,🎬 社媒视频
+
+  # Telegram（域名与裸 IP 规则集双保险）
+  - GEOSITE,telegram,🔰 节点选择
+  - RULE-SET,GEOIP-telegram,🔰 节点选择,no-resolve # 兜底直连 IP 的 MTProto / DC 服务器连接
+
+  # 游戏代理      （下面仅是以我的人生游戏：EVE Online 举例，可以加入你常玩的外服游戏，游戏类的服务器非常杂，种类繁多，一般都不会只有一个域名，让你的Agent帮你一网打尽！）
+
+  - GEOSITE,steam,🎮 游戏代理                      # Steam 商店 / 社区 / 工坊（下载 CDN 已在上方 steam@cn 直连）
+  - DOMAIN-SUFFIX,eveonline.com,🎮 游戏代理        # EVE Online 官网 / 登录 / 游戏服务端
+  - DOMAIN-SUFFIX,evetech.net,🎮 游戏代理          # EVE Online ESI 接口与启动器后端
+  - DOMAIN-SUFFIX,ccpgames.com,🎮 游戏代理         # CCP 启动器域
+  - DOMAIN-SUFFIX,ccpgamescdn.com,🎮 游戏代理      # CCP 客户端更新补丁 CDN
+  - DOMAIN-SUFFIX,extccp.com,🎮 游戏代理           # CCP 边缘服务
+  - DOMAIN-SUFFIX,evevanguardtech.com,🎮 游戏代理  # EVE Vanguard 游戏服务端
+  - PROCESS-NAME,GeForceNOW,🎮 游戏代理            # GeForce NOW 云游戏客户端进程（路由器环境可忽略或删除）
+  - PROCESS-NAME,GeForceNOW Helper,🎮 游戏代理
+  - PROCESS-NAME,GeForceNOWStreamer,🎮 游戏代理
+  - DOMAIN-SUFFIX,nvidiagrid.net,🎮 游戏代理       # GeForce NOW 会话调度与测速节点
+  - DOMAIN-SUFFIX,geforcenow.com,🎮 游戏代理       # GeForce NOW 网页端
+  - DOMAIN-SUFFIX,nvgs.nvidia.com,🎮 游戏代理      # GeForce NOW 登录鉴权
+  - IP-CIDR,66.22.128.0/20,🎮 游戏代理,no-resolve  # GeForce NOW 美/加/日等串流机房裸 IP UDP 网段（防漏入兜底绕远路）
+  - IP-CIDR,66.22.144.0/21,🎮 游戏代理,no-resolve
+  - IP-CIDR,66.22.152.0/24,🎮 游戏代理,no-resolve
+  - IP-CIDR,80.250.96.0/20,🎮 游戏代理,no-resolve  # GeForce NOW 欧洲串流机房裸 IP UDP 网段
+  - IP-CIDR,80.84.160.0/20,🎮 游戏代理,no-resolve
+  - IP-CIDR,185.136.68.0/22,🎮 游戏代理,no-resolve
+  - IP-CIDR,77.111.248.0/22,🎮 游戏代理,no-resolve
+
+  # 【 Apple 四层精细分流 】
+  # ── Siri / Apple 智能（需稳定非大陆出口）──
+  - DOMAIN-SUFFIX,apple-relay.apple.com,🇺🇳 稳定出口        # Apple 智能 / Siri 主中继
+  - DOMAIN-SUFFIX,apple-relay.cloudflare.com,🇺🇳 稳定出口   # Private Cloud Compute 中继（Cloudflare）
+  - DOMAIN-SUFFIX,apple-relay.fastly-edge.com,🇺🇳 稳定出口  # Private Cloud Compute 中继（Fastly）
+  - DOMAIN-SUFFIX,apple-relay.akamaized.net,🇺🇳 稳定出口    # Private Cloud Compute 中继（Akamai）
+  - DOMAIN,apple-relay.mask.apple-dns.net,🇺🇳 稳定出口      # Siri 关联 Private Relay 中继
+  - DOMAIN-SUFFIX,gspe1-ssl.ls.apple.com,🇺🇳 稳定出口       # Apple 智能 / ChatGPT 扩展区域判定端点
+  - DOMAIN-SUFFIX,cp4.cloudflare.com,🇺🇳 稳定出口           # Private Cloud Compute 补充端点
+  - DOMAIN-SUFFIX,guzzoni.apple.com,🇺🇳 稳定出口            # Siri 语音请求后端
+  - DOMAIN-SUFFIX,siri.apple.com,🇺🇳 稳定出口               # Siri 主域
+  - DOMAIN-SUFFIX,smoot.apple.com,🇺🇳 稳定出口              # Siri 建议 / Spotlight 搜索
+  # iCloud 私密代理（Private Relay）入口
+  - DOMAIN,mask.icloud.com,🇺🇳 稳定出口                     # Private Relay 入口
+  - DOMAIN,mask-h2.icloud.com,🇺🇳 稳定出口                  # Private Relay 入口（HTTP/2）
+  - DOMAIN-SUFFIX,mask.apple-dns.net,🇺🇳 稳定出口           # Private Relay 入口 CNAME
+  - DOMAIN,mask-api.icloud.com,🇺🇳 稳定出口                 # Private Relay 配置 API
+  # ── Apple 内容服务（高带宽或需海外出口，走节点选择）──
+  - DOMAIN-SUFFIX,news.apple.com,🔰 节点选择               # Apple News
+  - DOMAIN-SUFFIX,apple-news.com,🔰 节点选择               # Apple News
+  - DOMAIN-SUFFIX,tv.apple.com,🔰 节点选择                 # Apple TV+
+  - DOMAIN-SUFFIX,fitness.apple.com,🔰 节点选择            # Apple Fitness+
+  - DOMAIN-SUFFIX,mail.me.com,🔰 节点选择                  # iCloud 邮箱收发（IMAP/SMTP 直连常不稳）
+  # ── Apple 常规服务与大流量同步：默认直连，仍可在「🍎 苹果服务」组中调整 ──
+  - GEOSITE,apple-cn,🍎 苹果服务                           # 国内版 Apple 服务与地图 CDN（排在通用后缀之前）
+  - DOMAIN-SUFFIX,apple.com,🍎 苹果服务                    # Apple 主域兜底
+  - DOMAIN-SUFFIX,cdn-apple.com,🍎 苹果服务                # 系统更新与软件下载 CDN
+  - DOMAIN-SUFFIX,mzstatic.com,🍎 苹果服务                 # App Store 与媒体资源静态 CDN
+  - DOMAIN-SUFFIX,icloud.com,🍎 苹果服务                   # iCloud 主域
+  - DOMAIN-SUFFIX,icloud-content.com,🍎 苹果服务           # iCloud 照片/文件大流量同步直连，省节点流量
+  - DOMAIN-SUFFIX,apple-cloudkit.com,🍎 苹果服务           # CloudKit 同步服务
+  - DOMAIN-SUFFIX,edge.apple,🍎 苹果服务                   # Apple 自有 .apple 顶级域
+  - IP-CIDR,17.248.128.0/17,🇺🇳 稳定出口,no-resolve         # 从 17.0.0.0/8 中前置抠出 Apple 智能 (PCC) 裸 IP 节点池走稳定出口
+  - IP-CIDR,17.0.0.0/8,🍎 苹果服务,no-resolve              # 放在所有 Apple 域名规则之后兜底 APNs 推送等裸 IP 流量
+  - IP-CIDR6,2403:300::/32,🍎 苹果服务,no-resolve          # Apple 全球 IPv6 根网段（APNIC 亚太），兜底 IPv6 APNs 等裸 IP
+  - IP-CIDR6,2620:149::/32,🍎 苹果服务,no-resolve          # Apple 全球 IPv6 根网段（ARIN 北美）
+  - IP-CIDR6,2a01:b740::/32,🍎 苹果服务,no-resolve         # Apple 全球 IPv6 根网段（RIPE 欧洲）
+  - IP-CIDR6,2a01:b747::/32,🍎 苹果服务,no-resolve         # Apple 全球 IPv6 根网段（RIPE 扩展）
+  - IP-CIDR6,2620:0:1b00::/45,🍎 苹果服务,no-resolve       # Apple 全球 IPv6 根网段（ARIN 补充块）
+  - RULE-SET,ASN-apple-714,🍎 苹果服务,no-resolve          # 补充覆盖 17.0.0.0/8 之外的少量 Apple ASN 零散段
+
+  # 最终兜底：境外域名按名代理（避 DNS 污染），国内域名 / IP 直连，其余交给漏网之鱼
+  - GEOSITE,gfw,🔰 节点选择                                # 已知被屏蔽域名兜底走代理
+  - GEOSITE,geolocation-!cn,🔰 节点选择                    # 其余境外域名按名称走代理，减少 DNS 污染误判
+  - GEOSITE,cn,🎯 全球直连                                 # 中国大陆域名直连
+  - GEOIP,CN,🎯 全球直连                                   # 中国大陆 IP 直连（含无域名国内直连目标）
+  - MATCH,🐟 漏网之鱼                                      # 以上全未命中时进入最终兜底策略组
+
+# 分流规则结束
+
+
+# 域名嗅探：
+# 尝试从 HTTP / TLS / QUIC 连接中识别域名，让缺少域名的连接也有机会按域名规则分流。
+# 能否识别取决于协议中是否有可读取的域名信息；并非所有裸 IP 连接都能识别。
+sniffer:
+  enable: true
+  override-destination: false
+  sniff:
+    QUIC:
+      ports:
+      - 443
+    TLS:
+      ports:
+      - 443
+      - 8443
+    HTTP:
+      ports:
+      - 80
+      - 8080-8880
+      override-destination: true # HTTP 使用识别出的 Host 作为目标
+  # force-domain: []
+  skip-domain:
+  - Mijia Cloud
+  - dlg.io.mi.com
+  - "+.oray.com"
+  - "+.sunlogin.net"
+  - "+.push.apple.com"
+  parse-pure-ip: true # 当前设置下尝试识别无域名连接；已有 Fake-IP 域名的连接无需重复识别
