@@ -6,7 +6,7 @@
 
 **节点、密码、公钥和订阅链接全部为示例占位值，请填写自己的参数后再使用。**
 
-👉 [查看配置模板](./clash-mihomo.yaml) · [下载原始 YAML](https://raw.githubusercontent.com/bdhwrsh/clash-mihomo-yaml/main/clash-mihomo.yaml)
+👉 [查看配置模板](./clash-mihomo.yaml) · [下载 YAML模版](https://raw.githubusercontent.com/bdhwrsh/clash-mihomo-yaml/main/clash-mihomo.yaml)
 
 ## 适用范围
 
