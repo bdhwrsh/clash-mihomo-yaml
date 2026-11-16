@@ -10,10 +10,10 @@
 
 ## 适用范围
 
-- 面向支持本文件字段的 **Mihomo 内核客户端**（桌面端、移动端或软路由外壳），例如：[Clash Verge Rev](https://github.com/clash-verge-rev/clash-verge-rev)、[FlClash](https://github.com/chen08209/FlClash)、[Clash Mi](https://github.com/KaringX/clashmi)、[OpenClash](https://github.com/vernesong/OpenClash) 等；端口、系统代理、TUN 与控制面板由客户端接管，独立运行 [Mihomo](https://github.com/MetaCubeX/mihomo) 内核时需自行补齐入站配置。
+- 面向支持本文件字段的 **Mihomo 内核客户端**（桌面端、移动端或软路由外壳），例如：[Clash Verge Rev](https://github.com/clash-verge-rev/clash-verge-rev)、[FlClash](https://github.com/chen08209/FlClash)、[Clash Mi](https://github.com/KaringX/clashmi)、[OpenClash](https://github.com/vernesong/OpenClash) 等；端口、系统代理、TUN 与控制面板由客户端接管。
 - **不承诺原样兼容非 Mihomo 内核**：旧版 Clash、Stash、sing-box 等对 `geox-url`、`support-x25519mlkem768`、MRS 规则集或 `sniffer` 的支持存在差异。
 - Reality 节点需核对客户端与服务端的 TLS 指纹及 MLKEM 要求（参考 [Mihomo TLS / Reality 说明](https://wiki.metacubex.one/config/proxies/tls/)）。
-- `PROCESS-NAME` 规则能否生效取决于运行平台；OpenClash 等路由器环境看不到本机进程，可忽略或删除这些行。
+- `PROCESS-NAME` 规则能否生效取决于运行平台；OpenClash 等路由器环境看不到本机进程，会静默忽略或删除这些行。
 
 ## 核心调校亮点
 
